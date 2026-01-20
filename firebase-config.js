@@ -1,17 +1,24 @@
+// Firebase Configuration
 const firebaseConfig = {
-    apiKey: "TU_API_KEY_REAL_AQUI",
+    apiKey: "AIzaSyBrfkWrKlsDVlYppt1ObZNUWu2tCtBkjM4",
     authDomain: "cuadre-caja-cee4f.firebaseapp.com",
     projectId: "cuadre-caja-cee4f",
-    storageBucket: "cuadre-caja-cee4f.appspot.com",
-    messagingSenderId: "TU_SENDER_ID",
-    appId: "TU_APP_ID"
+    storageBucket: "cuadre-caja-cee4f.firebasestorage.app",
+    messagingSenderId: "674087467274",
+    appId: "1:674087467274:web:2e882e0b6a11d92bc7a2f3"
 };
 
+// Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
+
+// Referencias a servicios
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+// Configurar persistencia
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
+// Colecciones de Firestore
 const COLLECTIONS = {
     MOVIMIENTOS: 'movimientos',
     CUADRES: 'cuadres',
@@ -20,11 +27,25 @@ const COLLECTIONS = {
     CONFIGURACION: 'configuracion'
 };
 
+// Categorías predeterminadas
 const DEFAULT_CATEGORIAS = {
-    ingresos: ['Ventas', 'Servicios', 'Cobros', 'Otros Ingresos'],
-    egresos: ['Compras', 'Servicios', 'Salarios', 'Alquiler', 'Servicios Básicos', 'Otros Gastos']
+    ingresos: [
+        'Ventas',
+        'Servicios',
+        'Cobros',
+        'Otros Ingresos'
+    ],
+    egresos: [
+        'Compras',
+        'Servicios',
+        'Salarios',
+        'Alquiler',
+        'Servicios Básicos',
+        'Otros Gastos'
+    ]
 };
 
+// Inicializar categorías por defecto si no existen
 async function initDefaultCategories(userId) {
     try {
         const categoriasRef = db.collection(COLLECTIONS.CATEGORIAS).doc(userId);
@@ -42,6 +63,7 @@ async function initDefaultCategories(userId) {
     }
 }
 
+// Exportar para uso global
 window.firebaseConfig = firebaseConfig;
 window.auth = auth;
 window.db = db;
