@@ -310,21 +310,19 @@ async function guardarMovimiento() {
 async function loadMovimientos() {
     try {
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(today);
-        endOfDay.setHours(23, 59, 59, 999);
+        const todayStr = today.toISOString().split('T')[0];
         
         const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
             .where('userId', '==', currentUser.uid)
-            .where('fecha', '>=', today.toISOString())
-            .where('fecha', '<=', endOfDay.toISOString())
-            .orderBy('fecha', 'desc')
             .get();
         
-        movimientos = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        movimientos = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(mov => {
+                const movFecha = new Date(mov.fecha).toISOString().split('T')[0];
+                return movFecha === todayStr;
+            })
+            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
         
         renderMovimientos();
         actualizarResumenDia();
