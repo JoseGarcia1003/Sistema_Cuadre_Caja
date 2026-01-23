@@ -1,56 +1,27 @@
-// ========================================
-// SISTEMA DE CUADRE DE CAJA PRO - OPTIMIZADO
-// ========================================
-
+// SISTEMA OPTIMIZADO - CUADRE DE CAJA PRO
 let currentUser = null;
 let currentTab = 'movimientos';
 let movimientos = [];
 let charts = {};
 
-// ========================================
-// INICIALIZACIÓN
-// ========================================
-
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        document.getElementById('loadingScreen').style.display = 'none';
-    }, 2000);
-    
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            currentUser = user;
-            initApp();
-        } else {
-            showLogin();
-        }
-    });
-    
+    setTimeout(() => document.getElementById('loadingScreen').style.display = 'none', 2000);
+    auth.onAuthStateChanged(user => user ? (currentUser = user, initApp()) : showLogin());
     setupAuthListeners();
 });
 
-// ========================================
-// AUTENTICACIÓN
-// ========================================
-
+// AUTH
 function setupAuthListeners() {
     document.getElementById('loginBtn').addEventListener('click', login);
     document.getElementById('registerBtn').addEventListener('click', register);
     document.getElementById('logoutBtn').addEventListener('click', logout);
-    
-    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') login();
-    });
+    document.getElementById('loginPassword').addEventListener('keypress', e => e.key === 'Enter' && login());
 }
 
 async function login() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    
-    if (!email || !password) {
-        showAuthError('Por favor completa todos los campos');
-        return;
-    }
-    
+    if (!email || !password) return showAuthError('Completa todos los campos');
     try {
         await auth.signInWithEmailAndPassword(email, password);
         hideAuthError();
@@ -62,29 +33,20 @@ async function login() {
 async function register() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    
-    if (!email || !password) {
-        showAuthError('Por favor completa todos los campos');
-        return;
-    }
-    
-    if (password.length < 6) {
-        showAuthError('La contraseña debe tener al menos 6 caracteres');
-        return;
-    }
-    
+    if (!email || !password) return showAuthError('Completa todos los campos');
+    if (password.length < 6) return showAuthError('Mínimo 6 caracteres');
     try {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         await initDefaultCategories(userCredential.user.uid);
         hideAuthError();
-        showToast('Cuenta creada exitosamente', 'success');
+        showToast('Cuenta creada', 'success');
     } catch (error) {
         showAuthError(getAuthErrorMessage(error.code));
     }
 }
 
 async function logout() {
-    if (await showConfirm('¿Cerrar sesión?', '¿Estás seguro de que deseas salir?')) {
+    if (await showConfirm('¿Cerrar sesión?', '¿Salir del sistema?')) {
         await auth.signOut();
         location.reload();
     }
@@ -95,10 +57,10 @@ function showLogin() {
     document.getElementById('mainApp').style.display = 'none';
 }
 
-function showAuthError(message) {
-    const errorDiv = document.getElementById('authError');
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
+function showAuthError(msg) {
+    const err = document.getElementById('authError');
+    err.textContent = msg;
+    err.style.display = 'block';
 }
 
 function hideAuthError() {
@@ -106,28 +68,22 @@ function hideAuthError() {
 }
 
 function getAuthErrorMessage(code) {
-    const messages = {
-        'auth/email-already-in-use': 'Este correo ya está registrado',
-        'auth/invalid-email': 'Correo electrónico inválido',
+    const msgs = {
+        'auth/email-already-in-use': 'Correo ya registrado',
+        'auth/invalid-email': 'Correo inválido',
         'auth/user-not-found': 'Usuario no encontrado',
         'auth/wrong-password': 'Contraseña incorrecta',
-        'auth/weak-password': 'La contraseña es muy débil',
-        'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde'
+        'auth/weak-password': 'Contraseña débil'
     };
-    return messages[code] || 'Error de autenticación';
+    return msgs[code] || 'Error de autenticación';
 }
 
-// ========================================
-// INICIALIZACIÓN DE LA APP
-// ========================================
-
+// INIT APP
 async function initApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'grid';
     
     document.getElementById('userName').textContent = currentUser.email.split('@')[0];
-    document.getElementById('userRole').textContent = 'Usuario';
-    
     updateCurrentDate();
     setupEventListeners();
     
@@ -140,48 +96,40 @@ async function initApp() {
 
 function updateCurrentDate() {
     const today = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateStr = today.toLocaleDateString('es-ES', options);
-    document.getElementById('currentDate').textContent = dateStr;
-    
+    document.getElementById('currentDate').textContent = today.toLocaleDateString('es-ES', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
     const todayStr = today.toISOString().split('T')[0];
     document.getElementById('fechaDesde').value = todayStr;
     document.getElementById('fechaHasta').value = todayStr;
 }
 
-// ========================================
 // FONDO INTELIGENTE
-// ========================================
-
 async function cargarFondoInteligente() {
     try {
         const ayer = new Date();
         ayer.setDate(ayer.getDate() - 1);
         const ayerStr = ayer.toISOString().split('T')[0];
         
-        const cuadreAyer = await db.collection(COLLECTIONS.CUADRES)
-            .doc(`${currentUser.uid}_${ayerStr}`)
-            .get();
+        const cuadreAyer = await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${ayerStr}`).get();
         
         if (cuadreAyer.exists && cuadreAyer.data().totalContado !== undefined) {
-            const fondoAutomatico = cuadreAyer.data().totalContado;
-            document.getElementById('fondoInicial').value = fondoAutomatico.toFixed(2);
+            const fondo = cuadreAyer.data().totalContado;
+            document.getElementById('fondoInicial').value = fondo.toFixed(2);
             document.getElementById('fondoInicial').disabled = true;
             
             const today = new Date().toISOString().split('T')[0];
             await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${today}`).set({
-                fondoInicial: fondoAutomatico,
+                fondoInicial: fondo,
                 userId: currentUser.uid,
                 fecha: today,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
             
-            showToast(`Fondo automático: $${fondoAutomatico.toFixed(2)}`, 'info');
+            showToast(`Fondo automático: $${fondo.toFixed(2)}`, 'info');
         } else {
             const today = new Date().toISOString().split('T')[0];
-            const cuadreHoy = await db.collection(COLLECTIONS.CUADRES)
-                .doc(`${currentUser.uid}_${today}`)
-                .get();
+            const cuadreHoy = await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${today}`).get();
             
             if (cuadreHoy.exists && cuadreHoy.data().fondoInicial) {
                 document.getElementById('fondoInicial').value = cuadreHoy.data().fondoInicial;
@@ -189,15 +137,12 @@ async function cargarFondoInteligente() {
             document.getElementById('fondoInicial').disabled = false;
         }
     } catch (error) {
-        console.error('Error al cargar fondo:', error);
+        console.error('Error fondo:', error);
         document.getElementById('fondoInicial').disabled = false;
     }
 }
 
-// ========================================
 // EVENT LISTENERS
-// ========================================
-
 function setupEventListeners() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => switchTab(item.dataset.tab));
@@ -212,58 +157,49 @@ function setupEventListeners() {
     });
     
     document.getElementById('tipoMovimiento').addEventListener('change', updateCategoriasSelect);
-    document.getElementById('guardarFondoBtn').addEventListener('click', guardarFondoInicial);
-    document.getElementById('guardarCuadreBtn').addEventListener('click', guardarCuadre);
+    document.getElementById('guardarDatosBtn').addEventListener('click', guardarDatosCuadre);
+    document.getElementById('cuadrarCajaBtn').addEventListener('click', cuadrarCaja);
     
     document.querySelectorAll('.denom-input').forEach(input => {
         input.addEventListener('input', calcularTotalContado);
     });
     
+    document.getElementById('totalVentas').addEventListener('input', actualizarResumenCuadre);
+    
     document.getElementById('generarReporteBtn').addEventListener('click', generarReporte);
-    document.getElementById('exportarExcelBtn').addEventListener('click', exportarExcel);
     document.getElementById('searchMovimientos').addEventListener('input', filtrarMovimientos);
     
     document.getElementById('addCategoriaIngresoBtn').addEventListener('click', () => agregarCategoria('ingresos'));
-    document.getElementById('addCategoriaEgresoBtn').addEventListener('click', () => agregarCategoria('egresos'));
+    document.getElementById('addCategoriaGastoBtn').addEventListener('click', () => agregarCategoria('gastos'));
     document.getElementById('resetDataBtn').addEventListener('click', resetData);
+    
+    document.getElementById('cuadreOkBtn').addEventListener('click', () => {
+        document.getElementById('cuadreModal').classList.remove('active');
+    });
 }
 
 function switchTab(tabName) {
     currentTab = tabName;
-    
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.tab === tabName);
     });
-    
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.toggle('active', content.id === `tab-${tabName}`);
     });
     
-    if (tabName === 'cuadre') {
-        actualizarResumenCuadre();
-    } else if (tabName === 'graficos') {
-        renderCharts();
-    }
+    if (tabName === 'cuadre') actualizarResumenCuadre();
+    else if (tabName === 'graficos') renderCharts();
 }
 
 function toggleTheme() {
     document.body.classList.toggle('dark-theme');
     const isDark = document.body.classList.contains('dark-theme');
-    
-    const icon = document.querySelector('#themeToggle i');
-    icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-    
+    document.querySelector('#themeToggle i').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
     document.getElementById('darkModeSwitch').checked = isDark;
-    
-    if (currentTab === 'graficos') {
-        renderCharts();
-    }
+    if (currentTab === 'graficos') renderCharts();
 }
 
-// ========================================
 // MOVIMIENTOS
-// ========================================
-
 async function guardarMovimiento() {
     const tipo = document.getElementById('tipoMovimiento').value;
     const monto = parseFloat(document.getElementById('monto').value);
@@ -271,18 +207,11 @@ async function guardarMovimiento() {
     const descripcion = document.getElementById('descripcion').value.trim();
     const formaPago = document.getElementById('formaPago').value;
     
-    if (!monto || monto <= 0) {
-        showToast('Ingresa un monto válido', 'error');
-        return;
-    }
-    
-    if (!categoria) {
-        showToast('Selecciona una categoría', 'error');
-        return;
-    }
+    if (!monto || monto <= 0) return showToast('Monto inválido', 'error');
+    if (!categoria) return showToast('Selecciona categoría', 'error');
     
     try {
-        const movimiento = {
+        await db.collection(COLLECTIONS.MOVIMIENTOS).add({
             tipo,
             monto,
             categoria,
@@ -291,44 +220,36 @@ async function guardarMovimiento() {
             fecha: new Date().toISOString(),
             userId: currentUser.uid,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        await db.collection(COLLECTIONS.MOVIMIENTOS).add(movimiento);
+        });
         
         document.getElementById('movimientoForm').reset();
-        showToast(`${tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} registrado`, 'success');
+        const labels = { ingreso: 'Ingreso', gasto: 'Gasto', deposito: 'Depósito' };
+        showToast(`${labels[tipo]} registrado`, 'success');
         
         await loadMovimientos();
         actualizarResumenCuadre();
-        
     } catch (error) {
-        console.error('Error al guardar:', error);
-        showToast('Error al guardar el movimiento', 'error');
+        console.error('Error:', error);
+        showToast('Error al guardar', 'error');
     }
 }
 
 async function loadMovimientos() {
     try {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        
+        const todayStr = new Date().toISOString().split('T')[0];
         const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
             .where('userId', '==', currentUser.uid)
             .get();
         
         movimientos = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(mov => {
-                const movFecha = new Date(mov.fecha).toISOString().split('T')[0];
-                return movFecha === todayStr;
-            })
+            .filter(mov => new Date(mov.fecha).toISOString().split('T')[0] === todayStr)
             .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
         
         renderMovimientos();
         actualizarResumenDia();
-        
     } catch (error) {
-        console.error('Error al cargar movimientos:', error);
+        console.error('Error:', error);
     }
 }
 
@@ -336,22 +257,29 @@ function renderMovimientos() {
     const tbody = document.getElementById('movimientosTableBody');
     
     if (movimientos.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No hay movimientos registrados hoy</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No hay movimientos</td></tr>';
         return;
     }
     
     tbody.innerHTML = movimientos.map(mov => {
-        const fecha = new Date(mov.fecha);
-        const hora = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-        const badgeClass = mov.tipo === 'ingreso' ? 'badge-ingreso' : 'badge-egreso';
+        const hora = new Date(mov.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const badges = {
+            ingreso: 'badge-ingreso',
+            gasto: 'badge-gasto',
+            deposito: 'badge-deposito'
+        };
+        const labels = {
+            ingreso: '💰 INGRESO',
+            gasto: '💸 GASTO',
+            deposito: '🏦 DEPÓSITO'
+        };
         
         return `
             <tr>
                 <td>${hora}</td>
-                <td><span class="badge ${badgeClass}">${mov.tipo.toUpperCase()}</span></td>
+                <td><span class="badge ${badges[mov.tipo]}">${labels[mov.tipo]}</span></td>
                 <td>${mov.categoria}</td>
                 <td>${mov.descripcion || '-'}</td>
-                <td>${getFormaPagoLabel(mov.formaPago)}</td>
                 <td><strong>$${mov.monto.toFixed(2)}</strong></td>
                 <td>
                     <button class="action-btn btn-delete" onclick="eliminarMovimiento('${mov.id}')">
@@ -364,32 +292,29 @@ function renderMovimientos() {
 }
 
 function filtrarMovimientos() {
-    const searchTerm = document.getElementById('searchMovimientos').value.toLowerCase();
+    const search = document.getElementById('searchMovimientos').value.toLowerCase();
     const filtrados = movimientos.filter(mov => 
-        mov.categoria.toLowerCase().includes(searchTerm) ||
-        (mov.descripcion && mov.descripcion.toLowerCase().includes(searchTerm)) ||
-        mov.tipo.toLowerCase().includes(searchTerm)
+        mov.categoria.toLowerCase().includes(search) ||
+        (mov.descripcion && mov.descripcion.toLowerCase().includes(search))
     );
     
     const tbody = document.getElementById('movimientosTableBody');
-    
     if (filtrados.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No se encontraron resultados</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin resultados</td></tr>';
         return;
     }
     
     tbody.innerHTML = filtrados.map(mov => {
-        const fecha = new Date(mov.fecha);
-        const hora = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-        const badgeClass = mov.tipo === 'ingreso' ? 'badge-ingreso' : 'badge-egreso';
+        const hora = new Date(mov.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const badges = { ingreso: 'badge-ingreso', gasto: 'badge-gasto', deposito: 'badge-deposito' };
+        const labels = { ingreso: '💰 INGRESO', gasto: '💸 GASTO', deposito: '🏦 DEPÓSITO' };
         
         return `
             <tr>
                 <td>${hora}</td>
-                <td><span class="badge ${badgeClass}">${mov.tipo.toUpperCase()}</span></td>
+                <td><span class="badge ${badges[mov.tipo]}">${labels[mov.tipo]}</span></td>
                 <td>${mov.categoria}</td>
                 <td>${mov.descripcion || '-'}</td>
-                <td>${getFormaPagoLabel(mov.formaPago)}</td>
                 <td><strong>$${mov.monto.toFixed(2)}</strong></td>
                 <td>
                     <button class="action-btn btn-delete" onclick="eliminarMovimiento('${mov.id}')">
@@ -402,14 +327,14 @@ function filtrarMovimientos() {
 }
 
 async function eliminarMovimiento(id) {
-    if (await showConfirm('Eliminar Movimiento', '¿Estás seguro?')) {
+    if (await showConfirm('Eliminar', '¿Eliminar este movimiento?')) {
         try {
             await db.collection(COLLECTIONS.MOVIMIENTOS).doc(id).delete();
-            showToast('Movimiento eliminado', 'success');
+            showToast('Eliminado', 'success');
             await loadMovimientos();
             actualizarResumenCuadre();
         } catch (error) {
-            console.error('Error al eliminar:', error);
+            console.error('Error:', error);
             showToast('Error al eliminar', 'error');
         }
     }
@@ -417,63 +342,54 @@ async function eliminarMovimiento(id) {
 
 function actualizarResumenDia() {
     const ingresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0);
-    const egresos = movimientos.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + m.monto, 0);
-    const balance = ingresos - egresos;
+    const gastos = movimientos.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + m.monto, 0);
+    const depositos = movimientos.filter(m => m.tipo === 'deposito').reduce((sum, m) => sum + m.monto, 0);
     
     document.getElementById('totalIngresos').textContent = `$${ingresos.toFixed(2)}`;
-    document.getElementById('totalEgresos').textContent = `$${egresos.toFixed(2)}`;
-    document.getElementById('balance').textContent = `$${balance.toFixed(2)}`;
+    document.getElementById('totalGastos').textContent = `$${gastos.toFixed(2)}`;
+    document.getElementById('totalDepositos').textContent = `$${depositos.toFixed(2)}`;
 }
 
-function getFormaPagoLabel(forma) {
-    const labels = {
-        'efectivo': '💵 Efectivo',
-        'tarjeta': '💳 Tarjeta',
-        'transferencia': '🏦 Transferencia',
-        'cheque': '📝 Cheque'
-    };
-    return labels[forma] || forma;
-}
-
-// ========================================
-// CUADRE DE CAJA
-// ========================================
-
-async function guardarFondoInicial() {
-    const fondo = parseFloat(document.getElementById('fondoInicial').value);
+// CUADRE
+async function guardarDatosCuadre() {
+    const fondo = parseFloat(document.getElementById('fondoInicial').value) || 0;
+    const ventas = parseFloat(document.getElementById('totalVentas').value) || 0;
     
-    if (!fondo || fondo < 0) {
-        showToast('Ingresa un fondo válido', 'error');
-        return;
-    }
+    if (fondo < 0 || ventas < 0) return showToast('Valores inválidos', 'error');
     
     try {
         const today = new Date().toISOString().split('T')[0];
         await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${today}`).set({
             fondoInicial: fondo,
+            totalVentas: ventas,
             userId: currentUser.uid,
             fecha: today,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         
-        showToast('Fondo guardado', 'success');
+        showToast('Datos guardados', 'success');
         actualizarResumenCuadre();
-        
     } catch (error) {
-        console.error('Error al guardar fondo:', error);
-        showToast('Error al guardar fondo', 'error');
+        console.error('Error:', error);
+        showToast('Error al guardar', 'error');
     }
 }
 
 function actualizarResumenCuadre() {
-    const fondoInicial = parseFloat(document.getElementById('fondoInicial').value) || 0;
+    const fondo = parseFloat(document.getElementById('fondoInicial').value) || 0;
+    const ventas = parseFloat(document.getElementById('totalVentas').value) || 0;
     const ingresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0);
-    const egresos = movimientos.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + m.monto, 0);
-    const saldoEsperado = fondoInicial + ingresos - egresos;
+    const gastos = movimientos.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + m.monto, 0);
+    const depositos = movimientos.filter(m => m.tipo === 'deposito').reduce((sum, m) => sum + m.monto, 0);
     
-    document.getElementById('cuadreFondoInicial').textContent = `$${fondoInicial.toFixed(2)}`;
-    document.getElementById('cuadreIngresos').textContent = `$${ingresos.toFixed(2)}`;
-    document.getElementById('cuadreEgresos').textContent = `$${egresos.toFixed(2)}`;
+    // LÓGICA: Fondo + Ventas + Ingresos - Gastos - Depósitos
+    const saldoEsperado = fondo + ventas + ingresos - gastos - depositos;
+    
+    document.getElementById('resumenFondo').textContent = `$${fondo.toFixed(2)}`;
+    document.getElementById('resumenVentas').textContent = `$${ventas.toFixed(2)}`;
+    document.getElementById('resumenIngresos').textContent = `$${ingresos.toFixed(2)}`;
+    document.getElementById('resumenGastos').textContent = `-$${gastos.toFixed(2)}`;
+    document.getElementById('resumenDepositos').textContent = `-$${depositos.toFixed(2)}`;
     document.getElementById('saldoEsperado').textContent = `$${saldoEsperado.toFixed(2)}`;
     
     calcularTotalContado();
@@ -481,12 +397,10 @@ function actualizarResumenCuadre() {
 
 function calcularTotalContado() {
     let total = 0;
-    
     document.querySelectorAll('.denominacion-item').forEach(item => {
         const valor = parseFloat(item.dataset.valor);
         const cantidad = parseInt(item.querySelector('.denom-input').value) || 0;
         const subtotal = valor * cantidad;
-        
         item.querySelector('.denom-total').textContent = `$${subtotal.toFixed(2)}`;
         total += subtotal;
     });
@@ -498,25 +412,19 @@ function calcularTotalContado() {
     document.getElementById('diferencia').textContent = `$${diferencia.toFixed(2)}`;
     
     const difElem = document.getElementById('diferencia');
-    if (diferencia > 0) {
-        difElem.style.color = '#10b981';
-    } else if (diferencia < 0) {
-        difElem.style.color = '#ef4444';
-    } else {
-        difElem.style.color = 'white';
-    }
+    if (diferencia > 0) difElem.style.color = '#fbbf24';
+    else if (diferencia < 0) difElem.style.color = '#ef4444';
+    else difElem.style.color = '#10b981';
 }
 
-async function guardarCuadre() {
+async function cuadrarCaja() {
     const totalContado = parseFloat(document.getElementById('totalContado').textContent.replace('$', '')) || 0;
     const saldoEsperado = parseFloat(document.getElementById('saldoEsperado').textContent.replace('$', '')) || 0;
     const diferencia = totalContado - saldoEsperado;
     
     const denominaciones = {};
     document.querySelectorAll('.denominacion-item').forEach(item => {
-        const valor = item.dataset.valor;
-        const cantidad = parseInt(item.querySelector('.denom-input').value) || 0;
-        denominaciones[valor] = cantidad;
+        denominaciones[item.dataset.valor] = parseInt(item.querySelector('.denom-input').value) || 0;
     });
     
     try {
@@ -531,42 +439,69 @@ async function guardarCuadre() {
             fecha: today
         }, { merge: true });
         
-        if (diferencia === 0) {
-            showToast('Cuadre exacto ✓', 'success');
-        } else if (diferencia > 0) {
-            showToast(`Sobrante: $${diferencia.toFixed(2)}`, 'warning');
-        } else {
-            showToast(`Faltante: $${Math.abs(diferencia).toFixed(2)}`, 'error');
-        }
-        
+        mostrarResultadoCuadre(diferencia);
     } catch (error) {
-        console.error('Error al guardar cuadre:', error);
-        showToast('Error al guardar cuadre', 'error');
+        console.error('Error:', error);
+        showToast('Error al cuadrar', 'error');
     }
 }
 
-// ========================================
-// CATEGORÍAS
-// ========================================
+function mostrarResultadoCuadre(diferencia) {
+    const resultado = document.getElementById('cuadreResultado');
+    
+    if (diferencia === 0) {
+        resultado.innerHTML = `
+            <div class="cuadre-perfecto">
+                <i class="fas fa-check-circle"></i>
+                <h2>¡CAJA CUADRADA PERFECTAMENTE!</h2>
+                <p class="diferencia-monto">$0.00</p>
+                <p>El conteo coincide exactamente con el saldo esperado</p>
+            </div>
+        `;
+    } else if (diferencia > 0) {
+        resultado.innerHTML = `
+            <div class="cuadre-sobrante">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>SOBRANTE EN CAJA</h2>
+                <p class="diferencia-monto">+$${diferencia.toFixed(2)}</p>
+                <p>Hay más dinero del esperado</p>
+            </div>
+        `;
+    } else {
+        resultado.innerHTML = `
+            <div class="cuadre-faltante">
+                <i class="fas fa-times-circle"></i>
+                <h2>FALTANTE EN CAJA</h2>
+                <p class="diferencia-monto">-$${Math.abs(diferencia).toFixed(2)}</p>
+                <p>Falta dinero en caja</p>
+            </div>
+        `;
+    }
+    
+    document.getElementById('cuadreModal').classList.add('active');
+}
 
+// Continúa en siguiente parte...
+
+// CATEGORÍAS
 async function loadCategorias() {
     try {
         const doc = await db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid).get();
         
         if (doc.exists) {
             const data = doc.data();
-            renderCategoriasListas(data.ingresos, data.egresos);
+            renderCategoriasListas(data.ingresos, data.gastos, data.depositos);
             updateCategoriasSelect();
         } else {
             await initDefaultCategories(currentUser.uid);
             await loadCategorias();
         }
     } catch (error) {
-        console.error('Error al cargar categorías:', error);
+        console.error('Error:', error);
     }
 }
 
-function renderCategoriasListas(ingresos, egresos) {
+function renderCategoriasListas(ingresos, gastos, depositos) {
     document.getElementById('categoriasIngresoList').innerHTML = ingresos.map(cat => `
         <div class="categoria-item">
             <span>${cat}</span>
@@ -576,10 +511,10 @@ function renderCategoriasListas(ingresos, egresos) {
         </div>
     `).join('');
     
-    document.getElementById('categoriasEgresoList').innerHTML = egresos.map(cat => `
+    document.getElementById('categoriasGastoList').innerHTML = gastos.map(cat => `
         <div class="categoria-item">
             <span>${cat}</span>
-            <button class="categoria-delete" onclick="eliminarCategoria('egresos', '${cat}')">
+            <button class="categoria-delete" onclick="eliminarCategoria('gastos', '${cat}')">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -594,50 +529,47 @@ async function updateCategoriasSelect() {
         const doc = await db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid).get();
         
         if (doc.exists) {
-            const categorias = tipo === 'ingreso' ? doc.data().ingresos : doc.data().egresos;
-            select.innerHTML = '<option value="">Selecciona una categoría</option>' +
+            let categorias;
+            if (tipo === 'ingreso') categorias = doc.data().ingresos;
+            else if (tipo === 'gasto') categorias = doc.data().gastos;
+            else categorias = doc.data().depositos || ['Depósito a Banco'];
+            
+            select.innerHTML = '<option value="">Selecciona categoría</option>' +
                 categorias.map(cat => `<option value="${cat}">${cat}</option>`).join('');
         }
     } catch (error) {
-        console.error('Error al actualizar categorías:', error);
+        console.error('Error:', error);
     }
 }
 
 async function agregarCategoria(tipo) {
-    const inputId = tipo === 'ingresos' ? 'nuevaCategoriaIngreso' : 'nuevaCategoriaEgreso';
+    const inputId = tipo === 'ingresos' ? 'nuevaCategoriaIngreso' : 'nuevaCategoriaGasto';
     const input = document.getElementById(inputId);
     const nombre = input.value.trim();
     
-    if (!nombre) {
-        showToast('Ingresa un nombre', 'error');
-        return;
-    }
+    if (!nombre) return showToast('Ingresa nombre', 'error');
     
     try {
         const docRef = db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid);
         const doc = await docRef.get();
         const data = doc.data();
         
-        if (data[tipo].includes(nombre)) {
-            showToast('Categoría ya existe', 'warning');
-            return;
-        }
+        if (data[tipo].includes(nombre)) return showToast('Ya existe', 'warning');
         
         data[tipo].push(nombre);
         await docRef.update({ [tipo]: data[tipo] });
         
         input.value = '';
-        showToast('Categoría agregada', 'success');
+        showToast('Agregada', 'success');
         await loadCategorias();
-        
     } catch (error) {
         console.error('Error:', error);
-        showToast('Error al agregar categoría', 'error');
+        showToast('Error', 'error');
     }
 }
 
 async function eliminarCategoria(tipo, nombre) {
-    if (await showConfirm('Eliminar Categoría', `¿Eliminar "${nombre}"?`)) {
+    if (await showConfirm('Eliminar', `¿Eliminar "${nombre}"?`)) {
         try {
             const docRef = db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid);
             const doc = await docRef.get();
@@ -646,180 +578,132 @@ async function eliminarCategoria(tipo, nombre) {
             data[tipo] = data[tipo].filter(cat => cat !== nombre);
             await docRef.update({ [tipo]: data[tipo] });
             
-            showToast('Categoría eliminada', 'success');
+            showToast('Eliminada', 'success');
             await loadCategorias();
-            
         } catch (error) {
             console.error('Error:', error);
-            showToast('Error al eliminar', 'error');
+            showToast('Error', 'error');
         }
     }
 }
 
-// Continúa en siguiente mensaje...
-// ========================================
 // REPORTES
-// ========================================
-
 async function generarReporte() {
-    const fechaDesde = document.getElementById('fechaDesde').value;
-    const fechaHasta = document.getElementById('fechaHasta').value;
+    const desde = document.getElementById('fechaDesde').value;
+    const hasta = document.getElementById('fechaHasta').value;
     const tipo = document.getElementById('filtroTipo').value;
     
-    if (!fechaDesde || !fechaHasta) {
-        showToast('Selecciona un rango de fechas', 'error');
-        return;
-    }
+    if (!desde || !hasta) return showToast('Selecciona fechas', 'error');
     
     try {
         const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
             .where('userId', '==', currentUser.uid)
-            .where('fecha', '>=', new Date(fechaDesde).toISOString())
-            .where('fecha', '<=', new Date(fechaHasta + 'T23:59:59').toISOString())
-            .orderBy('fecha', 'desc')
             .get();
         
-        let reporteMovimientos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let movs = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(mov => {
+                const fecha = new Date(mov.fecha).toISOString().split('T')[0];
+                return fecha >= desde && fecha <= hasta;
+            });
         
-        if (tipo) reporteMovimientos = reporteMovimientos.filter(m => m.tipo === tipo);
+        if (tipo) movs = movs.filter(m => m.tipo === tipo);
         
-        const ingresos = reporteMovimientos.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0);
-        const egresos = reporteMovimientos.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + m.monto, 0);
+        movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
         
-        document.getElementById('reporteIngresos').textContent = `$${ingresos.toFixed(2)}`;
-        document.getElementById('reporteEgresos').textContent = `$${egresos.toFixed(2)}`;
-        document.getElementById('reporteBalance').textContent = `$${(ingresos - egresos).toFixed(2)}`;
-        
-        renderReporteTabla(reporteMovimientos);
-        renderReporteCategorias(reporteMovimientos);
-        
+        renderReporteTabla(movs);
         showToast('Reporte generado', 'success');
     } catch (error) {
         console.error('Error:', error);
-        showToast('Error al generar reporte', 'error');
+        showToast('Error', 'error');
     }
 }
 
-function renderReporteTabla(movimientos) {
+function renderReporteTabla(movs) {
     const tbody = document.getElementById('reporteTableBody');
     
-    if (movimientos.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No hay movimientos</td></tr>';
+    if (movs.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Sin movimientos</td></tr>';
         return;
     }
     
-    tbody.innerHTML = movimientos.map(mov => `
-        <tr>
-            <td>${new Date(mov.fecha).toLocaleDateString('es-ES')}</td>
-            <td><span class="badge badge-${mov.tipo}">${mov.tipo.toUpperCase()}</span></td>
-            <td>${mov.categoria}</td>
-            <td>${mov.descripcion || '-'}</td>
-            <td><strong>$${mov.monto.toFixed(2)}</strong></td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = movs.map(mov => {
+        const badges = { ingreso: 'badge-ingreso', gasto: 'badge-gasto', deposito: 'badge-deposito' };
+        const labels = { ingreso: 'INGRESO', gasto: 'GASTO', deposito: 'DEPÓSITO' };
+        
+        return `
+            <tr>
+                <td>${new Date(mov.fecha).toLocaleDateString('es-ES')}</td>
+                <td><span class="badge ${badges[mov.tipo]}">${labels[mov.tipo]}</span></td>
+                <td>${mov.categoria}</td>
+                <td>${mov.descripcion || '-'}</td>
+                <td><strong>$${mov.monto.toFixed(2)}</strong></td>
+            </tr>
+        `;
+    }).join('');
 }
 
-function renderReporteCategorias(movimientos) {
-    const categorias = {};
-    movimientos.forEach(mov => {
-        categorias[mov.categoria] = (categorias[mov.categoria] || 0) + mov.monto;
-    });
-    
-    const ctx = document.getElementById('reporteCategoriaChart');
-    
-    if (charts.reporteCategoria) charts.reporteCategoria.destroy();
-    
-    charts.reporteCategoria = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(categorias),
-            datasets: [{
-                label: 'Monto',
-                data: Object.values(categorias),
-                backgroundColor: '#10b981',
-                borderRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { callback: v => `$${v}` }
-                }
-            }
-        }
-    });
-}
-
-function exportarExcel() {
-    showToast('Función próximamente', 'info');
-}
-
-// ========================================
 // GRÁFICOS
-// ========================================
-
 async function renderCharts() {
-    await renderIngresosEgresosChart();
-    await renderCategoriasPieChart();
-    await renderFormasPagoChart();
-    await renderTendenciaMensualChart();
+    await renderChart7Dias();
+    await renderChartTipos();
 }
 
-async function renderIngresosEgresosChart() {
+async function renderChart7Dias() {
     try {
-        const ultimos7Dias = [];
-        const today = new Date();
-        
+        const dias = [];
         for (let i = 6; i >= 0; i--) {
-            const fecha = new Date(today);
+            const fecha = new Date();
             fecha.setDate(fecha.getDate() - i);
-            ultimos7Dias.push(fecha);
+            dias.push(fecha);
         }
         
-        const ingresosPorDia = [];
-        const egresosPorDia = [];
+        const ingresos = [], gastos = [], depositos = [];
         
-        for (const fecha of ultimos7Dias) {
-            const fechaInicio = new Date(fecha.setHours(0, 0, 0, 0));
-            const fechaFin = new Date(fecha.setHours(23, 59, 59, 999));
-            
+        for (const dia of dias) {
+            const diaStr = dia.toISOString().split('T')[0];
             const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
                 .where('userId', '==', currentUser.uid)
-                .where('fecha', '>=', fechaInicio.toISOString())
-                .where('fecha', '<=', fechaFin.toISOString())
                 .get();
             
-            const movs = snapshot.docs.map(doc => doc.data());
-            ingresosPorDia.push(movs.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0));
-            egresosPorDia.push(movs.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + m.monto, 0));
+            const movs = snapshot.docs
+                .map(doc => doc.data())
+                .filter(mov => new Date(mov.fecha).toISOString().split('T')[0] === diaStr);
+            
+            ingresos.push(movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + m.monto, 0));
+            gastos.push(movs.filter(m => m.tipo === 'gasto').reduce((s, m) => s + m.monto, 0));
+            depositos.push(movs.filter(m => m.tipo === 'deposito').reduce((s, m) => s + m.monto, 0));
         }
         
-        const ctx = document.getElementById('ingresosEgresosChart');
+        const ctx = document.getElementById('chart7dias');
+        if (charts.chart7dias) charts.chart7dias.destroy();
         
-        if (charts.ingresosEgresos) charts.ingresosEgresos.destroy();
-        
-        charts.ingresosEgresos = new Chart(ctx, {
+        charts.chart7dias = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ultimos7Dias.map(f => f.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })),
+                labels: dias.map(d => d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })),
                 datasets: [
                     {
                         label: 'Ingresos',
-                        data: ingresosPorDia,
+                        data: ingresos,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         tension: 0.4,
                         fill: true
                     },
                     {
-                        label: 'Egresos',
-                        data: egresosPorDia,
+                        label: 'Gastos',
+                        data: gastos,
                         borderColor: '#ef4444',
                         backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Depósitos',
+                        data: depositos,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         tension: 0.4,
                         fill: true
                     }
@@ -842,32 +726,31 @@ async function renderIngresosEgresosChart() {
     }
 }
 
-async function renderCategoriasPieChart() {
+async function renderChartTipos() {
     try {
-        const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-        
+        const primerDia = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
             .where('userId', '==', currentUser.uid)
-            .where('fecha', '>=', primerDiaMes.toISOString())
             .get();
         
-        const categorias = {};
-        snapshot.docs.forEach(doc => {
-            const mov = doc.data();
-            categorias[mov.categoria] = (categorias[mov.categoria] || 0) + mov.monto;
-        });
+        const movs = snapshot.docs
+            .map(doc => doc.data())
+            .filter(mov => new Date(mov.fecha) >= primerDia);
         
-        const ctx = document.getElementById('categoriasPieChart');
+        const ingresos = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + m.monto, 0);
+        const gastos = movs.filter(m => m.tipo === 'gasto').reduce((s, m) => s + m.monto, 0);
+        const depositos = movs.filter(m => m.tipo === 'deposito').reduce((s, m) => s + m.monto, 0);
         
-        if (charts.categoriasPie) charts.categoriasPie.destroy();
+        const ctx = document.getElementById('chartTipos');
+        if (charts.chartTipos) charts.chartTipos.destroy();
         
-        charts.categoriasPie = new Chart(ctx, {
+        charts.chartTipos = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(categorias),
+                labels: ['Ingresos', 'Gastos', 'Depósitos'],
                 datasets: [{
-                    data: Object.values(categorias),
-                    backgroundColor: ['#10b981', '#34d399', '#059669', '#fbbf24', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#f97316', '#14b8a6'],
+                    data: [ingresos, gastos, depositos],
+                    backgroundColor: ['#10b981', '#ef4444', '#3b82f6'],
                     borderWidth: 2,
                     borderColor: '#fff'
                 }]
@@ -883,120 +766,16 @@ async function renderCategoriasPieChart() {
     }
 }
 
-async function renderFormasPagoChart() {
-    const formasPago = {};
-    movimientos.forEach(mov => {
-        formasPago[mov.formaPago] = (formasPago[mov.formaPago] || 0) + mov.monto;
-    });
-    
-    const ctx = document.getElementById('formasPagoChart');
-    
-    if (charts.formasPago) charts.formasPago.destroy();
-    
-    charts.formasPago = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: Object.keys(formasPago).map(getFormaPagoLabel),
-            datasets: [{
-                data: Object.values(formasPago),
-                backgroundColor: ['#10b981', '#34d399', '#fbbf24', '#f59e0b'],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
-        }
-    });
-}
-
-async function renderTendenciaMensualChart() {
-    try {
-        const meses = [];
-        const today = new Date();
-        
-        for (let i = 5; i >= 0; i--) {
-            meses.push(new Date(today.getFullYear(), today.getMonth() - i, 1));
-        }
-        
-        const ingresosPorMes = [];
-        const egresosPorMes = [];
-        
-        for (const mes of meses) {
-            const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
-            const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0, 23, 59, 59);
-            
-            const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
-                .where('userId', '==', currentUser.uid)
-                .where('fecha', '>=', primerDia.toISOString())
-                .where('fecha', '<=', ultimoDia.toISOString())
-                .get();
-            
-            const movs = snapshot.docs.map(doc => doc.data());
-            ingresosPorMes.push(movs.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0));
-            egresosPorMes.push(movs.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + m.monto, 0));
-        }
-        
-        const ctx = document.getElementById('tendenciaMensualChart');
-        
-        if (charts.tendenciaMensual) charts.tendenciaMensual.destroy();
-        
-        charts.tendenciaMensual = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: meses.map(m => m.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })),
-                datasets: [
-                    {
-                        label: 'Ingresos',
-                        data: ingresosPorMes,
-                        backgroundColor: '#10b981',
-                        borderRadius: 8
-                    },
-                    {
-                        label: 'Egresos',
-                        data: egresosPorMes,
-                        backgroundColor: '#ef4444',
-                        borderRadius: 8
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: v => `$${v}` }
-                    }
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-
-// ========================================
 // UTILIDADES
-// ========================================
-
-function showToast(message, type = 'info') {
+function showToast(msg, type = 'info') {
     const container = document.getElementById('toastContainer');
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-exclamation-circle',
-        warning: 'fa-exclamation-triangle',
-        info: 'fa-info-circle'
-    };
+    const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
     
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
         <i class="fas ${icons[type]}"></i>
-        <span class="toast-message">${message}</span>
+        <span class="toast-message">${msg}</span>
         <button class="toast-close" onclick="this.parentElement.remove()">
             <i class="fas fa-times"></i>
         </button>
@@ -1006,11 +785,11 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-function showConfirm(title, message) {
+function showConfirm(title, msg) {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirmModal');
         document.getElementById('confirmTitle').textContent = title;
-        document.getElementById('confirmMessage').textContent = message;
+        document.getElementById('confirmMessage').textContent = msg;
         
         modal.classList.add('active');
         
@@ -1037,27 +816,21 @@ function showConfirm(title, message) {
 }
 
 async function resetData() {
-    if (await showConfirm('⚠️ Limpiar Datos', '¿Eliminar TODO? No se puede deshacer.')) {
+    if (await showConfirm('⚠️ Limpiar', '¿Eliminar TODO?')) {
         try {
-            const movSnapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
-                .where('userId', '==', currentUser.uid)
-                .get();
+            const movSnap = await db.collection(COLLECTIONS.MOVIMIENTOS).where('userId', '==', currentUser.uid).get();
+            const cuadreSnap = await db.collection(COLLECTIONS.CUADRES).where('userId', '==', currentUser.uid).get();
             
             const batch = db.batch();
-            movSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-            
-            const cuadreSnapshot = await db.collection(COLLECTIONS.CUADRES)
-                .where('userId', '==', currentUser.uid)
-                .get();
-            
-            cuadreSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+            movSnap.docs.forEach(doc => batch.delete(doc.ref));
+            cuadreSnap.docs.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
             
             showToast('Datos eliminados', 'success');
             location.reload();
         } catch (error) {
             console.error('Error:', error);
-            showToast('Error al limpiar datos', 'error');
+            showToast('Error', 'error');
         }
     }
 }
