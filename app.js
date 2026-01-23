@@ -529,10 +529,16 @@ async function updateCategoriasSelect() {
         const doc = await db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid).get();
         
         if (doc.exists) {
+            const data = doc.data();
             let categorias;
-            if (tipo === 'ingreso') categorias = doc.data().ingresos;
-            else if (tipo === 'gasto') categorias = doc.data().gastos;
-            else categorias = doc.data().depositos || ['Depósito a Banco'];
+            
+            if (tipo === 'ingreso') {
+                categorias = data.ingresos || ['Dinero Personal', 'Otros Ingresos'];
+            } else if (tipo === 'gasto') {
+                categorias = data.gastos || ['Compras', 'Servicios', 'Salarios', 'Otros Gastos'];
+            } else if (tipo === 'deposito') {
+                categorias = ['Depósito a Banco', 'Depósito Nocturno'];
+            }
             
             select.innerHTML = '<option value="">Selecciona categoría</option>' +
                 categorias.map(cat => `<option value="${cat}">${cat}</option>`).join('');
