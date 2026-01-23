@@ -486,11 +486,30 @@ function mostrarResultadoCuadre(diferencia) {
 // CATEGORÍAS
 async function loadCategorias() {
     try {
-        const doc = await db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid).get();
+        const docRef = db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid);
+        const doc = await docRef.get();
         
         if (doc.exists) {
             const data = doc.data();
-            renderCategoriasListas(data.ingresos, data.gastos, data.depositos);
+            
+            // Migrar estructura antigua a nueva
+            if (data.egresos && !data.gastos) {
+                await docRef.update({
+                    gastos: data.egresos,
+                    depositos: ['Depósito a Banco']
+                });
+                // Recargar después de migrar
+                const newDoc = await docRef.get();
+                const newData = newDoc.data();
+                renderCategoriasListas(newData.ingresos, newData.gastos, newData.depositos);
+            } else {
+                renderCategoriasListas(
+                    data.ingresos || [], 
+                    data.gastos || data.egresos || [], 
+                    data.depositos || []
+                );
+            }
+            
             updateCategoriasSelect();
         } else {
             await initDefaultCategories(currentUser.uid);
@@ -528,21 +547,44 @@ async function updateCategoriasSelect() {
     try {
         const doc = await db.collection(COLLECTIONS.CATEGORIAS).doc(currentUser.uid).get();
         
+        let categorias;
+        
         if (doc.exists) {
             const data = doc.data();
-            let categorias;
             
             if (tipo === 'ingreso') {
-                categorias = data.ingresos || ['Dinero Personal', 'Otros Ingresos'];
+                categorias = data.ingresos || [];
             } else if (tipo === 'gasto') {
-                categorias = data.gastos || ['Compras', 'Servicios', 'Salarios', 'Otros Gastos'];
+                // Soportar estructura antigua (egresos) y nueva (gastos)
+                categorias = data.gastos || data.egresos || [];
             } else if (tipo === 'deposito') {
-                categorias = ['Depósito a Banco', 'Depósito Nocturno'];
+                categorias = data.depositos || ['Depósito a Banco'];
             }
-            
-            select.innerHTML = '<option value="">Selecciona categoría</option>' +
-                categorias.map(cat => `<option value="${cat}">${cat}</option>`).join('');
         }
+        
+        // Categorías por defecto si no hay en BD
+        if (!categorias || categorias.length === 0) {
+            if (tipo === 'ingreso') {
+                categorias = ['Dinero Personal (Suelto)', 'Devoluciones', 'Otros Ingresos'];
+            } else if (tipo === 'gasto') {
+                categorias = [
+                    'Compras de Mercadería',
+                    'Servicios Básicos',
+                    'Salarios',
+                    'Alquiler',
+                    'Mantenimiento',
+                    'Transporte',
+                    'Papelería',
+                    'Otros Gastos'
+                ];
+            } else {
+                categorias = ['Depósito a Banco'];
+            }
+        }
+        
+        select.innerHTML = '<option value="">Selecciona categoría</option>' +
+            categorias.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            
     } catch (error) {
         console.error('Error:', error);
     }
