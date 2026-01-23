@@ -2,12 +2,12 @@
 // IMPORTANTE: Reemplaza estos valores con tu configuración de Firebase
 
 const firebaseConfig = {
-    apiKey: "TU_API_KEY_AQUI",
-    authDomain: "tu-proyecto.firebaseapp.com",
-    projectId: "tu-proyecto-id",
-    storageBucket: "tu-proyecto.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef123456"
+    apiKey: "AIzaSyBrfkWrKlsDVlYppt1ObZNUWu2tCtBkjM4",
+    authDomain: "cuadre-caja-cee4f.firebaseapp.com",
+    projectId: "cuadre-caja-cee4f",
+    storageBucket: "cuadre-caja-cee4f.firebasestorage.app",
+    messagingSenderId: "674087467274",
+    appId: "1:674087467274:web:2e882e0b6a11d92bc7a2f3"
 };
 
 // Inicializar Firebase
