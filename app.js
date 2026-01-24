@@ -248,6 +248,7 @@ async function loadMovimientos() {
         
         renderMovimientos();
         actualizarResumenDia();
+        actualizarResumenCuadre();
     } catch (error) {
         console.error('Error:', error);
     }
