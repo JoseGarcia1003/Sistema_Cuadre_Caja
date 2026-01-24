@@ -404,15 +404,6 @@
                                 <input type="date" id="fechaHasta">
                             </div>
                             <div class="form-group">
-                                <label>Tipo</label>
-                                <select id="filtroTipo">
-                                    <option value="">Todos</option>
-                                    <option value="ingreso">Ingresos</option>
-                                    <option value="gasto">Gastos</option>
-                                    <option value="deposito">Depósitos</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <button id="generarReporteBtn" class="btn-primary">
                                     <i class="fas fa-sync-alt"></i> Generar
                                 </button>
@@ -429,14 +420,16 @@
                                 <thead>
                                     <tr>
                                         <th>Fecha</th>
-                                        <th>Tipo</th>
-                                        <th>Categoría</th>
-                                        <th>Descripción</th>
-                                        <th>Monto</th>
+                                        <th>Fondo</th>
+                                        <th>Ventas</th>
+                                        <th>Ingresos</th>
+                                        <th>Salidas</th>
+                                        <th>Total Caja</th>
+                                        <th>Diferencia</th>
                                     </tr>
                                 </thead>
                                 <tbody id="reporteTableBody">
-                                    <tr class="empty-row"><td colspan="5">Genera un reporte</td></tr>
+                                    <tr class="empty-row"><td colspan="7">Genera un reporte</td></tr>
                                 </tbody>
                             </table>
                         </div>
