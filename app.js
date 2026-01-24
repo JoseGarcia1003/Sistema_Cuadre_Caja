@@ -382,8 +382,12 @@ function actualizarResumenCuadre() {
     const gastos = movimientos.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + m.monto, 0);
     const depositos = movimientos.filter(m => m.tipo === 'deposito').reduce((sum, m) => sum + m.monto, 0);
     
-    // LÓGICA: Fondo + Ventas + Ingresos - Gastos - Depósitos
-    const saldoEsperado = fondo + ventas + ingresos - gastos - depositos;
+    // Mostrar total de depósitos automáticamente
+    document.getElementById('totalDepositos').value = depositos.toFixed(2);
+    
+    // NUEVA LÓGICA: Gastos + Depósitos = Total Salidas
+    const totalSalidas = gastos + depositos;
+    const saldoEsperado = fondo + ventas + ingresos - totalSalidas;
     
     document.getElementById('resumenFondo').textContent = `$${fondo.toFixed(2)}`;
     document.getElementById('resumenVentas').textContent = `$${ventas.toFixed(2)}`;
