@@ -159,6 +159,7 @@ function setupEventListeners() {
     document.getElementById('tipoMovimiento').addEventListener('change', updateCategoriasSelect);
     document.getElementById('guardarDatosBtn').addEventListener('click', guardarDatosCuadre);
     document.getElementById('cuadrarCajaBtn').addEventListener('click', cuadrarCaja);
+    document.getElementById('guardarCajaBtn').addEventListener('click', guardarCaja);
     
     document.querySelectorAll('.denom-input').forEach(input => {
         input.addEventListener('input', calcularTotalContado);
@@ -448,6 +449,40 @@ async function cuadrarCaja() {
     } catch (error) {
         console.error('Error:', error);
         showToast('Error al cuadrar', 'error');
+    }
+}
+
+async function guardarCaja() {
+    const totalContado = parseFloat(document.getElementById('totalContado').textContent.replace('$', '')) || 0;
+    
+    if (totalContado === 0) {
+        showToast('Primero cuenta el efectivo en caja', 'warning');
+        return;
+    }
+    
+    if (!await showConfirm('Guardar Caja', `¿Guardar $${totalContado.toFixed(2)} como fondo para mañana?`)) {
+        return;
+    }
+    
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${today}`).set({
+            totalContado,
+            fondoGuardado: true,
+            fechaGuardado: new Date().toISOString(),
+            userId: currentUser.uid,
+            fecha: today
+        }, { merge: true });
+        
+        showToast(`Caja guardada. Mañana tendrás $${totalContado.toFixed(2)} de fondo inicial`, 'success');
+        
+        // Limpiar contadores
+        document.querySelectorAll('.denom-input').forEach(input => input.value = 0);
+        calcularTotalContado();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al guardar caja', 'error');
     }
 }
 
