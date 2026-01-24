@@ -163,6 +163,19 @@ function setupEventListeners() {
     
     document.querySelectorAll('.denom-input').forEach(input => {
         input.addEventListener('input', calcularTotalContado);
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const inputs = Array.from(document.querySelectorAll('.denom-input'));
+                const currentIndex = inputs.indexOf(e.target);
+                if (currentIndex < inputs.length - 1) {
+                    inputs[currentIndex + 1].focus();
+                    inputs[currentIndex + 1].select();
+                } else {
+                    e.target.blur();
+                }
+            }
+        });
     });
     
     document.getElementById('totalVentas').addEventListener('input', actualizarResumenCuadre);
@@ -454,6 +467,8 @@ async function cuadrarCaja() {
 
 async function guardarCaja() {
     const totalContado = parseFloat(document.getElementById('totalContado').textContent.replace('$', '')) || 0;
+    const saldoEsperado = parseFloat(document.getElementById('saldoEsperado').textContent.replace('$', '')) || 0;
+    const diferencia = totalContado - saldoEsperado;
     
     if (totalContado === 0) {
         showToast('Primero cuenta el efectivo en caja', 'warning');
@@ -466,15 +481,44 @@ async function guardarCaja() {
     
     try {
         const today = new Date().toISOString().split('T')[0];
+        const fondo = parseFloat(document.getElementById('fondoInicial').value) || 0;
+        const ventas = parseFloat(document.getElementById('totalVentas').value) || 0;
+        const ingresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.monto, 0);
+        const gastos = movimientos.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + m.monto, 0);
+        const depositos = movimientos.filter(m => m.tipo === 'deposito').reduce((sum, m) => sum + m.monto, 0);
+        
+        const denominaciones = {};
+        document.querySelectorAll('.denominacion-item').forEach(item => {
+            denominaciones[item.dataset.valor] = parseInt(item.querySelector('.denom-input').value) || 0;
+        });
+        
+        // Guardar registro completo del día
         await db.collection(COLLECTIONS.CUADRES).doc(`${currentUser.uid}_${today}`).set({
+            // Datos del cuadre
             totalContado,
+            saldoEsperado,
+            diferencia,
+            denominaciones,
+            
+            // Datos del día
+            fondoInicial: fondo,
+            totalVentas: ventas,
+            totalIngresos: ingresos,
+            totalGastos: gastos,
+            totalDepositos: depositos,
+            
+            // Movimientos del día
+            cantidadMovimientos: movimientos.length,
+            movimientosIds: movimientos.map(m => m.id),
+            
+            // Metadata
             fondoGuardado: true,
             fechaGuardado: new Date().toISOString(),
             userId: currentUser.uid,
             fecha: today
         }, { merge: true });
         
-        showToast(`Caja guardada. Mañana tendrás $${totalContado.toFixed(2)} de fondo inicial`, 'success');
+        showToast(`✓ Caja guardada. Mañana: $${totalContado.toFixed(2)}`, 'success');
         
         // Limpiar contadores
         document.querySelectorAll('.denom-input').forEach(input => input.value = 0);
@@ -679,27 +723,39 @@ async function eliminarCategoria(tipo, nombre) {
 async function generarReporte() {
     const desde = document.getElementById('fechaDesde').value;
     const hasta = document.getElementById('fechaHasta').value;
-    const tipo = document.getElementById('filtroTipo').value;
     
     if (!desde || !hasta) return showToast('Selecciona fechas', 'error');
     
     try {
-        const snapshot = await db.collection(COLLECTIONS.MOVIMIENTOS)
+        const cuadresSnapshot = await db.collection(COLLECTIONS.CUADRES)
             .where('userId', '==', currentUser.uid)
+            .where('fecha', '>=', desde)
+            .where('fecha', '<=', hasta)
+            .where('fondoGuardado', '==', true)
             .get();
         
-        let movs = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(mov => {
-                const fecha = new Date(mov.fecha).toISOString().split('T')[0];
-                return fecha >= desde && fecha <= hasta;
-            });
+        const cuadres = cuadresSnapshot.docs.map(doc => doc.data()).sort((a, b) => b.fecha.localeCompare(a.fecha));
         
-        if (tipo) movs = movs.filter(m => m.tipo === tipo);
+        if (cuadres.length === 0) {
+            document.getElementById('reporteTableBody').innerHTML = '<tr class="empty-row"><td colspan="8">No hay cuadres guardados</td></tr>';
+            return showToast('Sin cuadres guardados en este período', 'warning');
+        }
         
-        movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        const tbody = document.getElementById('reporteTableBody');
+        tbody.innerHTML = cuadres.map(c => `
+            <tr>
+                <td>${new Date(c.fecha).toLocaleDateString('es-ES')}</td>
+                <td>$${c.fondoInicial.toFixed(2)}</td>
+                <td>$${c.totalVentas.toFixed(2)}</td>
+                <td>$${c.totalIngresos.toFixed(2)}</td>
+                <td>$${(c.totalGastos + c.totalDepositos).toFixed(2)}</td>
+                <td><strong>$${c.totalContado.toFixed(2)}</strong></td>
+                <td style="color: ${c.diferencia === 0 ? '#10b981' : c.diferencia > 0 ? '#fbbf24' : '#ef4444'}">
+                    ${c.diferencia === 0 ? '✓' : c.diferencia > 0 ? '+' : ''}$${c.diferencia.toFixed(2)}
+                </td>
+            </tr>
+        `).join('');
         
-        renderReporteTabla(movs);
         showToast('Reporte generado', 'success');
     } catch (error) {
         console.error('Error:', error);
@@ -708,27 +764,7 @@ async function generarReporte() {
 }
 
 function renderReporteTabla(movs) {
-    const tbody = document.getElementById('reporteTableBody');
-    
-    if (movs.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Sin movimientos</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = movs.map(mov => {
-        const badges = { ingreso: 'badge-ingreso', gasto: 'badge-gasto', deposito: 'badge-deposito' };
-        const labels = { ingreso: 'INGRESO', gasto: 'GASTO', deposito: 'DEPÓSITO' };
-        
-        return `
-            <tr>
-                <td>${new Date(mov.fecha).toLocaleDateString('es-ES')}</td>
-                <td><span class="badge ${badges[mov.tipo]}">${labels[mov.tipo]}</span></td>
-                <td>${mov.categoria}</td>
-                <td>${mov.descripcion || '-'}</td>
-                <td><strong>$${mov.monto.toFixed(2)}</strong></td>
-            </tr>
-        `;
-    }).join('');
+    // Función legacy - ahora generarReporte maneja todo
 }
 
 // GRÁFICOS
