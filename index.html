@@ -249,6 +249,12 @@
                                 <small>Ingresa el total de ventas de tu sistema contable</small>
                             </div>
                             
+                            <div class="form-group">
+                                <label>Total de Depósitos ($)</label>
+                                <input type="number" id="totalDepositos" step="0.01" value="0.00" disabled>
+                                <small>Se calcula automáticamente de tus registros</small>
+                            </div>
+                            
                             <button id="guardarDatosBtn" class="btn-primary btn-block">
                                 <i class="fas fa-save"></i> Guardar Datos
                             </button>
@@ -540,6 +546,6 @@
     </div>
 
     <script src="firebase-config.js"></script>
-    <script src="app.js"></script>
+    <script src="app-optimizado.js"></script>
 </body>
 </html>
