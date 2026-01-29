@@ -179,6 +179,7 @@ function setupEventListeners() {
     });
     
     document.getElementById('totalVentas').addEventListener('input', actualizarResumenCuadre);
+    document.getElementById('fondoInicial').addEventListener('input', actualizarResumenCuadre);
     
     document.getElementById('generarReporteBtn').addEventListener('click', generarReporte);
     document.getElementById('searchMovimientos').addEventListener('input', filtrarMovimientos);
@@ -201,8 +202,11 @@ function switchTab(tabName) {
         content.classList.toggle('active', content.id === `tab-${tabName}`);
     });
     
-    if (tabName === 'cuadre') actualizarResumenCuadre();
-    else if (tabName === 'graficos') renderCharts();
+    if (tabName === 'cuadre') {
+        actualizarResumenCuadre();
+    } else if (tabName === 'graficos') {
+        renderCharts();
+    }
 }
 
 function toggleTheme() {
@@ -727,39 +731,40 @@ async function generarReporte() {
     if (!desde || !hasta) return showToast('Selecciona fechas', 'error');
     
     try {
-        const cuadresSnapshot = await db.collection(COLLECTIONS.CUADRES)
+        const snapshot = await db.collection(COLLECTIONS.CUADRES)
             .where('userId', '==', currentUser.uid)
-            .where('fecha', '>=', desde)
-            .where('fecha', '<=', hasta)
-            .where('fondoGuardado', '==', true)
             .get();
         
-        const cuadres = cuadresSnapshot.docs.map(doc => doc.data()).sort((a, b) => b.fecha.localeCompare(a.fecha));
-        
-        if (cuadres.length === 0) {
-            document.getElementById('reporteTableBody').innerHTML = '<tr class="empty-row"><td colspan="8">No hay cuadres guardados</td></tr>';
-            return showToast('Sin cuadres guardados en este período', 'warning');
-        }
+        const cuadres = snapshot.docs
+            .map(doc => doc.data())
+            .filter(c => c.fondoGuardado && c.fecha >= desde && c.fecha <= hasta)
+            .sort((a, b) => b.fecha.localeCompare(a.fecha));
         
         const tbody = document.getElementById('reporteTableBody');
+        
+        if (cuadres.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin cuadres</td></tr>';
+            return showToast('Sin cuadres guardados', 'warning');
+        }
+        
         tbody.innerHTML = cuadres.map(c => `
             <tr>
                 <td>${new Date(c.fecha).toLocaleDateString('es-ES')}</td>
-                <td>$${c.fondoInicial.toFixed(2)}</td>
-                <td>$${c.totalVentas.toFixed(2)}</td>
-                <td>$${c.totalIngresos.toFixed(2)}</td>
-                <td>$${(c.totalGastos + c.totalDepositos).toFixed(2)}</td>
-                <td><strong>$${c.totalContado.toFixed(2)}</strong></td>
+                <td>$${(c.fondoInicial || 0).toFixed(2)}</td>
+                <td>$${(c.totalVentas || 0).toFixed(2)}</td>
+                <td>$${(c.totalIngresos || 0).toFixed(2)}</td>
+                <td>$${((c.totalGastos || 0) + (c.totalDepositos || 0)).toFixed(2)}</td>
+                <td><strong>$${(c.totalContado || 0).toFixed(2)}</strong></td>
                 <td style="color: ${c.diferencia === 0 ? '#10b981' : c.diferencia > 0 ? '#fbbf24' : '#ef4444'}">
-                    ${c.diferencia === 0 ? '✓' : c.diferencia > 0 ? '+' : ''}$${c.diferencia.toFixed(2)}
+                    ${c.diferencia === 0 ? '✓ ' : (c.diferencia > 0 ? '+' : '')}$${Math.abs(c.diferencia || 0).toFixed(2)}
                 </td>
             </tr>
         `).join('');
         
-        showToast('Reporte generado', 'success');
+        showToast(`${cuadres.length} cuadre(s)`, 'success');
     } catch (error) {
         console.error('Error:', error);
-        showToast('Error', 'error');
+        showToast('Error: ' + error.message, 'error');
     }
 }
 
